@@ -1,0 +1,66 @@
+name: Test Build
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+#   직접 서버 운영시 (자체 호스팅)
+#   runs-on: action-runner-dev-linux
+
+    steps:
+      # Repo 체크아웃
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # package manager를 자동으로 감지하는 단계
+      - name: Detect package manager
+        id: detect-package-manager
+        run: |
+          if [ -f "${{ github.workspace }}/visualization/package.json" ]; then
+            echo "manager=npm" >> $GITHUB_OUTPUT
+            echo "command=ci" >> $GITHUB_OUTPUT
+            echo "runner=npx --no-install" >> $GITHUB_OUTPUT
+            exit 0
+          elif [ -f "${{ github.workspace }}/visualization/yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+            echo "command=install" >> $GITHUB_OUTPUT
+            echo "runner=yarn" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "Unable to determine package manager" >&2
+            exit 1
+          fi
+        working-directory: ./visualization
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+#          cache: ${{ steps.detect-package-manager.outputs.manager }}
+
+      - name: Install dependencies
+        run: npm install
+        # 만일, 프로젝트 경로 Depth가 한 층 더 들어간다면, 아래처럼
+        # Detect package manager의 -f package.json 찾는 경로 또한 {{.}}/visualization/package.json 
+        # working-directory: ./visualization 
+
+      - name: Run ESLint
+        run: npm run lint
+
+# TODO : Jest Test 코드 추가
+#      - name: Run Tests
+#        run: npm test
+
+      - name: Build Next.js
+        run: npm run build
